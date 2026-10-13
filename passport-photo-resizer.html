@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Passport Photo Resizer — PixelOptimizer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #0b1b2b; line-height: 1.5; background: #fff; padding: 20px; font-size: 16px; }
+.wrap { max-width: 900px; margin: 0 auto; }
+h1 { font-size: 2rem; font-weight: 700; margin: 0 0 12px; }
+.lead { font-size: 1.05rem; color: #475569; margin: 0 0 28px; }
+.drop { background: #fff; border: 2px dashed #c7d6ec; border-radius: 20px; padding: 48px 24px; text-align: center; cursor: pointer; margin-bottom: 20px; transition: .2s; }
+.drop:hover, .drop.over { border-color: #2563eb; background: #f8faff; }
+.drop .ico { font-size: 3rem; margin-bottom: 16px; display: block; }
+.drop h3 { font-size: 1.3rem; margin: 0 0 8px; font-weight: 700; }
+.drop p { font-size: .95rem; color: #64748b; margin: 0; }
+.pick { display: inline-block; margin-top: 18px; background: #2563eb; color: #fff; font-weight: 600; padding: 11px 26px; border-radius: 40px; font-size: .95rem; border: none; cursor: pointer; font-family: inherit; }
+.editor { display: none; background: #fff; border-radius: 20px; border: 1px solid #eef2f6; padding: 24px; }
+.editor.on { display: block; }
+.head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #eef2f6; }
+.fname { font-weight: 600; font-size: .95rem; }
+.preview { background: #0b1b2b; border-radius: 12px; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 220px; margin-bottom: 18px; }
+.preview img { max-width: 100%; max-height: 400px; border-radius: 8px; }
+.countries { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.country-btn { background: #f1f5f9; color: #334155; border: 2px solid transparent; padding: 12px; border-radius: 12px; font-size: .9rem; font-weight: 600; cursor: pointer; text-align: center; font-family: inherit; transition: all .15s; }
+.country-btn:hover { background: #e2e8f0; }
+.country-btn.active { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+.country-btn .size { display: block; font-size: .7rem; font-weight: 500; opacity: .8; margin-top: 3px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: #2563eb; color: #fff; font-weight: 600; padding: 12px 26px; border-radius: 40px; font-size: .98rem; border: none; cursor: pointer; font-family: inherit; margin-right: 8px; margin-bottom: 8px; }
+.btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+.ghost { background: transparent; color: #64748b; border: none; font-weight: 600; padding: 10px 16px; cursor: pointer; border-radius: 40px; font-size: .9rem; font-family: inherit; }
+.result { display: none; margin-top: 24px; padding-top: 24px; border-top: 1px solid #eef2f6; }
+.result.on { display: block; }
+.result h3 { font-size: 1.15rem; color: #10b981; margin: 0 0 14px; font-weight: 700; }
+.result img { max-width: 100%; max-height: 400px; border-radius: 12px; display: block; margin: 0 auto 14px; }
+.meta { text-align: center; font-size: .9rem; color: #64748b; margin-bottom: 16px; }
+.priv { margin-top: 28px; padding: 18px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; font-size: .88rem; color: #166534; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Passport Photo Resizer</h1>
+  <p class="lead">Resize your photo to standard passport dimensions for your country.</p>
+
+  <div class="drop" id="drop">
+    <span class="ico">📷</span>
+    <h3>Drop photo here</h3>
+    <p>or click to browse — JPG, PNG</p>
+    <button type="button" class="pick" onclick="document.getElementById('file').click()">Choose photo</button>
+    <input type="file" id="file" accept="image/*" style="display:none">
+  </div>
+
+  <div class="editor" id="editor">
+    <div class="head">
+      <div class="fname" id="fname">photo.jpg</div>
+      <div style="font-size:.82rem;color:#64748b">Original: <strong id="dim">—</strong></div>
+    </div>
+    <div class="preview"><img id="prev" alt="" style="display:none"></div>
+
+    <h3 style="font-size:1rem;font-weight:700;margin:0 0 12px;">Choose country format:</h3>
+    <div class="countries" id="countries">
+      <button type="button" class="country-btn active" data-w="600" data-h="600">US<span class="size">2×2 in · 600×600</span></button>
+      <button type="button" class="country-btn" data-w="413" data-h="531">UK / EU<span class="size">35×45 mm · 413×531</span></button>
+      <button type="button" class="country-btn" data-w="390" data-h="567">India<span class="size">35×45 mm · 390×567</span></button>
+      <button type="button" class="country-btn" data-w="413" data-h="531">China<span class="size">33×48 mm · 413×531</span></button>
+      <button type="button" class="country-btn" data-w="354" data-h="472">Canada<span class="size">50×70 mm · 354×472</span></button>
+      <button type="button" class="country-btn" data-w="413" data-h="531">Australia<span class="size">35×45 mm · 413×531</span></button>
+    </div>
+
+    <button type="button" class="btn" id="go">Resize for passport</button>
+    <button type="button" class="ghost" id="reset">Choose another</button>
+
+    <div class="result" id="result">
+      <h3>✓ Resized successfully!</h3>
+      <img id="resultImg" alt="">
+      <div class="meta" id="meta"></div>
+      <div style="text-align:center">
+        <button type="button" class="btn" id="dl">Download passport photo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="priv"><strong>100% private.</strong> Everything runs in your browser.</div>
+</div>
+
+<script>
+(function(){
+  var s = { img: null, url: null, targetW: 600, targetH: 600 };
+  var $ = function(id){ return document.getElementById(id) };
+  var drop = $('drop'), fi = $('file'), ed = $('editor'), pv = $('prev'), fn = $('fname'), dm = $('dim'), go = $('go'), rst = $('reset'), res = $('result'), ri = $('resultImg'), rm = $('meta'), dl = $('dl'), countriesEl = $('countries');
+  if(!drop) return;
+
+  function load(f){
+    if(!f || f.type.indexOf('image/')!==0) return alert('Please select an image.');
+    var r = new FileReader();
+    r.onload = function(e){
+      var i = new Image();
+      i.onload = function(){
+        s.img = i;
+        pv.src = e.target.result; pv.style.display = 'block';
+        ed.classList.add('on'); res.classList.remove('on');
+        fn.textContent = f.name;
+        dm.textContent = i.naturalWidth + ' × ' + i.naturalHeight;
+      };
+      i.src = e.target.result;
+    };
+    r.readAsDataURL(f);
+  }
+
+  countriesEl.addEventListener('click', function(e){
+    var btn = e.target.closest('.country-btn');
+    if(!btn) return;
+    countriesEl.querySelectorAll('.country-btn').forEach(function(b){ b.classList.toggle('active', b === btn) });
+    s.targetW = parseInt(btn.getAttribute('data-w'), 10);
+    s.targetH = parseInt(btn.getAttribute('data-h'), 10);
+  });
+
+  go.addEventListener('click', function(){
+    if(!s.img) return;
+    var tw = s.targetW, th = s.targetH;
+    var c = document.createElement('canvas'); c.width = tw; c.height = th;
+    var x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.fillStyle = '#fff'; x.fillRect(0, 0, tw, th);
+    // Center-crop to target aspect ratio
+    var srcAspect = s.img.naturalWidth / s.img.naturalHeight;
+    var dstAspect = tw / th;
+    var sw, sh, sx, sy;
+    if(srcAspect > dstAspect){
+      sh = s.img.naturalHeight;
+      sw = sh * dstAspect;
+      sx = (s.img.naturalWidth - sw) / 2;
+      sy = 0;
+    } else {
+      sw = s.img.naturalWidth;
+      sh = sw / dstAspect;
+      sx = 0;
+      sy = (s.img.naturalHeight - sh) / 2;
+    }
+    x.drawImage(s.img, sx, sy, sw, sh, 0, 0, tw, th);
+    c.toBlob(function(b){
+      if(!b) return alert('Resize failed.');
+      if(s.url) URL.revokeObjectURL(s.url);
+      s.url = URL.createObjectURL(b);
+      ri.src = s.url;
+      rm.innerHTML = tw + ' × ' + th + ' px • <strong style="color:#10b981">' + (b.size/1024).toFixed(1) + ' KB</strong>';
+      res.classList.add('on');
+      res.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 'image/jpeg', 0.92);
+  });
+
+  dl.addEventListener('click', function(){
+    if(!s.url) return;
+    var a = document.createElement('a'); a.href = s.url; a.download = 'passport-photo.jpg';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+
+  rst.addEventListener('click', function(){
+    ed.classList.remove('on'); res.classList.remove('on');
+    s.img = null; fi.value = '';
+    drop.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  drop.addEventListener('click', function(e){ if(e.target.classList.contains('pick')) return; fi.click() });
+  fi.addEventListener('change', function(e){ if(e.target.files[0]){ load(e.target.files[0]); fi.value = '' } });
+  ['dragenter','dragover'].forEach(function(v){ drop.addEventListener(v, function(e){ e.preventDefault(); drop.classList.add('over') }) });
+  ['dragleave','drop'].forEach(function(v){ drop.addEventListener(v, function(e){ e.preventDefault(); drop.classList.remove('over') }) });
+  drop.addEventListener('drop', function(e){ if(e.dataTransfer.files[0]) load(e.dataTransfer.files[0]) });
+})();
+</script>
+</body>
+</html>
