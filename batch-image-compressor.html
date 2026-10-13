@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batch Image Compressor — PixelOptimizer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #0b1b2b; line-height: 1.5; background: #ffffff; padding: 20px; font-size: 16px; }
+.wrap { max-width: 1000px; margin: 0 auto; }
+h1 { font-size: 2rem; font-weight: 700; margin: 0 0 12px; line-height: 1.2; }
+.lead { font-size: 1.05rem; color: #475569; margin: 0 0 28px; }
+
+/* Dropzone */
+.drop { background: #fff; border: 2px dashed #c7d6ec; border-radius: 20px; padding: 48px 24px; text-align: center; cursor: pointer; margin-bottom: 20px; transition: .2s; }
+.drop:hover, .drop.over { border-color: #2563eb; background: #f8faff; }
+.drop .ico { font-size: 3rem; margin-bottom: 16px; display: block; }
+.drop h3 { font-size: 1.3rem; margin: 0 0 8px; font-weight: 700; }
+.drop p { font-size: .95rem; color: #64748b; margin: 0; }
+.pick { display: inline-block; margin-top: 18px; background: #2563eb; color: #fff; font-weight: 600; padding: 11px 26px; border-radius: 40px; font-size: .95rem; border: none; cursor: pointer; font-family: inherit; }
+.pick:hover { background: #1d4ed8; }
+
+/* Settings panel */
+.settings { display: none; background: #fff; border-radius: 20px; border: 1px solid #eef2f6; padding: 24px; margin-bottom: 20px; box-shadow: 0 6px 20px -12px rgba(0,0,0,.08); }
+.settings.on { display: block; }
+.settings h3 { font-size: 1rem; font-weight: 700; margin: 0 0 18px; text-transform: uppercase; letter-spacing: .5px; color: #2563eb; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+.field label { display: flex; justify-content: space-between; align-items: center; font-size: .9rem; font-weight: 600; color: #1e293b; margin-bottom: 8px; }
+.field label span { background: #eff6ff; color: #2563eb; padding: 3px 10px; border-radius: 20px; font-size: .85rem; font-weight: 700; }
+.range { width: 100%; -webkit-appearance: none; appearance: none; height: 6px; background: #e2e8f0; border-radius: 3px; outline: none; }
+.range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #2563eb; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 8px rgba(37,99,235,.4); }
+.range::-moz-range-thumb { width: 20px; height: 20px; background: #2563eb; border: none; border-radius: 50%; cursor: pointer; }
+.select { width: 100%; padding: 11px 14px; border: 1px solid #dde5ef; border-radius: 12px; font-size: .95rem; font-family: inherit; background: #fff; color: #0b1b2b; outline: none; cursor: pointer; }
+.select:focus { border-color: #2563eb; }
+
+/* Actions */
+.actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: #2563eb; color: #fff; font-weight: 600; padding: 12px 26px; border-radius: 40px; font-size: .98rem; border: none; cursor: pointer; font-family: inherit; }
+.btn:hover:not(:disabled) { background: #1d4ed8; }
+.btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+.btn-secondary { background: transparent; color: #2563eb; border: 2px solid #2563eb; }
+.btn-secondary:hover:not(:disabled) { background: #eff6ff; }
+.btn-ghost { background: transparent; color: #64748b; border: none; font-weight: 600; padding: 10px 16px; cursor: pointer; border-radius: 40px; font-size: .9rem; font-family: inherit; }
+.btn-ghost:hover { color: #ef4444; background: #fef2f2; }
+
+/* Stats */
+.stats { display: none; background: linear-gradient(135deg, #eff6ff, #dbeafe); border-radius: 16px; padding: 20px 24px; margin-bottom: 20px; border: 1px solid #bfdbfe; }
+.stats.on { display: block; }
+.stats-row { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 16px; }
+.stat { text-align: center; flex: 1; min-width: 100px; }
+.stat .num { font-size: 1.4rem; font-weight: 800; color: #1e40af; line-height: 1.2; }
+.stat .lbl { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: #1e40af; font-weight: 600; opacity: .85; margin-top: 4px; }
+
+/* Results grid */
+.results { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.card { background: #fff; border: 1px solid #eef2f6; border-radius: 14px; overflow: hidden; box-shadow: 0 6px 18px -10px rgba(0,0,0,.08); display: flex; flex-direction: column; }
+.thumb { width: 100%; height: 140px; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; border-bottom: 1px solid #eef2f6; }
+.thumb img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.save-badge { position: absolute; top: 8px; right: 8px; background: #10b981; color: white; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+.info-card { padding: 14px 16px 16px; flex-grow: 1; display: flex; flex-direction: column; }
+.fname { font-size: .85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px; }
+.sizes { display: flex; justify-content: space-between; font-size: .78rem; color: #64748b; margin-bottom: 12px; }
+.sizes .new { color: #10b981; font-weight: 700; }
+.dl-btn { background: #2563eb; color: white; font-weight: 600; padding: 9px 12px; border-radius: 30px; font-size: .82rem; border: none; cursor: pointer; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-family: inherit; }
+.dl-btn:hover { background: #1d4ed8; }
+.dl-btn.remove { background: transparent; color: #64748b; border: 1px solid #e2e8f0; }
+.dl-btn.remove:hover { background: #fef2f2; color: #ef4444; border-color: #fecaca; }
+
+/* Privacy */
+.priv { margin-top: 28px; padding: 18px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; font-size: .88rem; color: #166534; }
+.priv strong { color: #14532d; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Batch Image Compressor</h1>
+  <p class="lead">Compress dozens of images at once. Everything runs in your browser — no uploads, no waiting.</p>
+
+  <div class="drop" id="drop">
+    <span class="ico">🗂️</span>
+    <h3>Drop images here (multiple allowed)</h3>
+    <p>or click to browse — JPG, PNG, WebP</p>
+    <button type="button" class="pick" onclick="document.getElementById('file').click()">Choose images</button>
+    <input type="file" id="file" accept="image/*" multiple style="display:none">
+  </div>
+
+  <div class="settings" id="settings">
+    <h3>⚙️ Compression settings</h3>
+    <div class="grid">
+      <div class="field">
+        <label>Quality <span id="qualVal">75%</span></label>
+        <input type="range" class="range" id="qual" min="10" max="100" value="75" step="5">
+      </div>
+      <div class="field">
+        <label>Max width (px) <span id="maxWVal">1920</span></label>
+        <input type="range" class="range" id="maxW" min="320" max="4000" value="1920" step="80">
+      </div>
+      <div class="field">
+        <label>Output format</label>
+        <select class="select" id="format">
+          <option value="image/jpeg">JPEG (universal)</option>
+          <option value="image/webp">WebP (smallest)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Background (for transparency)</label>
+        <select class="select" id="bg">
+          <option value="#ffffff">White</option>
+          <option value="#000000">Black</option>
+          <option value="#f8fafc">Light gray</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions" id="actions" style="display:none;">
+    <button type="button" class="btn" id="go">Compress all</button>
+    <button type="button" class="btn btn-secondary" id="dlAll">Download all</button>
+    <button type="button" class="btn-ghost" id="clear">Clear all</button>
+  </div>
+
+  <div class="stats" id="statsBar">
+    <div class="stats-row">
+      <div class="stat"><div class="num" id="statOrig">0 KB</div><div class="lbl">Original</div></div>
+      <div class="stat"><div class="num" id="statNew">0 KB</div><div class="lbl">Compressed</div></div>
+      <div class="stat"><div class="num" id="statSaved">0%</div><div class="lbl">Saved</div></div>
+      <div class="stat"><div class="num" id="statCount">0</div><div class="lbl">Files</div></div>
+    </div>
+  </div>
+
+  <div class="results" id="results"></div>
+
+  <div class="priv"><strong>100% private.</strong> All compression happens locally in your browser. Your images never leave your device.</div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var queue=[];
+  var $=function(id){return document.getElementById(id)};
+  var drop=$('drop'),fi=$('file'),settings=$('settings'),actions=$('actions'),statsBar=$('statsBar'),results=$('results');
+  var qual=$('qual'),qualVal=$('qualVal'),maxW=$('maxW'),maxWVal=$('maxWVal'),format=$('format'),bg=$('bg');
+  var goBtn=$('go'),dlAllBtn=$('dlAll'),clearBtn=$('clear');
+
+  function fmt(b){if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(1)+' KB';return (b/1048576).toFixed(2)+' MB'}
+  function uid(){return 'b_'+Math.random().toString(36).slice(2,10)}
+
+  function render(){
+    if(queue.length===0){settings.classList.remove('on');actions.style.display='none';statsBar.classList.remove('on');results.innerHTML='';return}
+    settings.classList.add('on');actions.style.display='flex';
+    var done=queue.filter(function(i){return i.status==='done'});
+    var anyDone=done.length>0;
+    dlAllBtn.style.display=anyDone?'inline-flex':'none';
+    if(done.length){
+      var to=0,tn=0;done.forEach(function(i){to+=i.origSize||0;tn+=i.newSize||0});
+      statsBar.classList.add('on');
+      $('statOrig').textContent=fmt(to);
+      $('statNew').textContent=fmt(tn);
+      $('statSaved').textContent=(to>0?Math.round((1-tn/to)*100):0)+'%';
+      $('statCount').textContent=done.length;
+    } else statsBar.classList.remove('on');
+
+    var html='';
+    queue.forEach(function(item){
+      html+='<div class="card">';
+      html+='<div class="thumb">';
+      if(item.dataUrl)html+='<img src="'+item.dataUrl+'" alt="">';
+      if(item.status==='done'&&item.origSize>0){
+        var p=Math.round((1-item.newSize/item.origSize)*100);
+        html+='<span class="save-badge">'+(p>0?'-'+p+'%':'0%')+'</span>';
+      }
+      html+='</div>';
+      html+='<div class="info-card">';
+      html+='<div class="fname" title="'+item.name+'">'+item.name+'</div>';
+      html+='<div class="sizes"><span>'+fmt(item.origSize)+'</span><span class="new">'+(item.status==='done'?fmt(item.newSize):item.status==='working'?'...':'—')+'</span></div>';
+      if(item.status==='done'){
+        html+='<button type="button" class="dl-btn" data-action="download" data-id="'+item.id+'">Download</button>';
+      } else if(item.status==='working'){
+        html+='<button type="button" class="dl-btn" disabled>Compressing...</button>';
+      } else {
+        html+='<button type="button" class="dl-btn remove" data-action="remove" data-id="'+item.id+'">Remove</button>';
+      }
+      html+='</div></div>';
+    });
+    results.innerHTML=html;
+  }
+
+  function loadFile(file){
+    var id=uid();
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        queue.push({id:id,name:file.name,origSize:file.size,dataUrl:e.target.result,img:img,status:'pending'});
+        render();
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function compressItem(item,cb){
+    item.status='working';render();
+    var img=item.img;
+    var q=parseInt(qual.value,10)/100;
+    var mw=parseInt(maxW.value,10);
+    var ratio=img.naturalWidth>mw?mw/img.naturalWidth:1;
+    var w=Math.round(img.naturalWidth*ratio);
+    var h=Math.round(img.naturalHeight*ratio);
+    var mime=format.value;
+    if(mime==='image/png')mime='image/jpeg';
+    var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+    var ctx=canvas.getContext('2d');
+    if(mime==='image/jpeg'){ctx.fillStyle=bg.value||'#ffffff';ctx.fillRect(0,0,w,h)}
+    ctx.imageSmoothingQuality='high';
+    ctx.drawImage(img,0,0,w,h);
+    canvas.toBlob(function(blob){
+      if(!blob){item.status='pending';cb();return}
+      item.blob=blob;item.newSize=blob.size;item.status='done';cb();
+    },mime,q);
+  }
+
+  function compressAll(){
+    var pending=queue.filter(function(i){return i.status!=='done'});
+    if(pending.length===0)return;
+    goBtn.disabled=true;goBtn.textContent='Compressing...';
+    var i=0;
+    function next(){
+      if(i>=pending.length){goBtn.disabled=false;goBtn.textContent='Compress all';render();return}
+      compressItem(pending[i++],function(){render();setTimeout(next,10)});
+    }
+    next();
+  }
+
+  function downloadItem(id){
+    var item=queue.filter(function(i){return i.id===id})[0];
+    if(!item||!item.blob)return;
+    var url=URL.createObjectURL(item.blob);
+    var a=document.createElement('a');a.href=url;a.download=item.name.replace(/\.[^.]+$/,'')+'-pxo.jpg';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url)},2000);
+  }
+
+  function dlAll(){
+    var done=queue.filter(function(i){return i.status==='done'&&i.blob});
+    done.forEach(function(item,i){setTimeout(function(){downloadItem(item.id)},i*300)});
+  }
+
+  // Listeners
+  drop.addEventListener('click',function(e){if(e.target.classList.contains('pick'))return;fi.click()});
+  fi.addEventListener('change',function(e){
+    if(e.target.files)for(var i=0;i<e.target.files.length;i++)loadFile(e.target.files[i]);
+    fi.value='';
+  });
+  ['dragenter','dragover'].forEach(function(v){drop.addEventListener(v,function(e){e.preventDefault();drop.classList.add('over')})});
+  ['dragleave','drop'].forEach(function(v){drop.addEventListener(v,function(e){e.preventDefault();drop.classList.remove('over')})});
+  drop.addEventListener('drop',function(e){
+    if(e.dataTransfer.files)for(var i=0;i<e.dataTransfer.files.length;i++)loadFile(e.dataTransfer.files[i]);
+  });
+  qual.addEventListener('input',function(){qualVal.textContent=qual.value+'%'});
+  maxW.addEventListener('input',function(){maxWVal.textContent=maxW.value});
+  goBtn.addEventListener('click',compressAll);
+  dlAllBtn.addEventListener('click',dlAll);
+  clearBtn.addEventListener('click',function(){
+    if(!queue.length)return;
+    if(!confirm('Remove all images from queue?'))return;
+    queue=[];render();
+  });
+  results.addEventListener('click',function(e){
+    var btn=e.target.closest('button[data-action]');
+    if(!btn)return;
+    var action=btn.getAttribute('data-action'),id=btn.getAttribute('data-id');
+    if(action==='download')downloadItem(id);
+    else if(action==='remove'){queue=queue.filter(function(i){return i.id!==id});render()}
+  });
+})();
+</script>
+</body>
+</html>
