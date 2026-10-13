@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batch Resizer — PixelOptimizer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #0b1b2b; line-height: 1.5; background: #fff; padding: 20px; font-size: 16px; }
+.wrap { max-width: 1100px; margin: 0 auto; }
+h1 { font-size: 2rem; font-weight: 700; margin: 0 0 12px; }
+.lead { font-size: 1.05rem; color: #475569; margin: 0 0 28px; }
+.drop { background: #fff; border: 2px dashed #c7d6ec; border-radius: 20px; padding: 48px 24px; text-align: center; cursor: pointer; margin-bottom: 20px; transition: .2s; }
+.drop:hover, .drop.over { border-color: #2563eb; background: #f8faff; }
+.drop .ico { font-size: 3rem; margin-bottom: 16px; display: block; }
+.drop h3 { font-size: 1.3rem; margin: 0 0 8px; font-weight: 700; }
+.drop p { font-size: .95rem; color: #64748b; margin: 0; }
+.pick { display: inline-block; margin-top: 18px; background: #2563eb; color: #fff; font-weight: 600; padding: 11px 26px; border-radius: 40px; font-size: .95rem; border: none; cursor: pointer; font-family: inherit; }
+.settings { display: none; background: #fff; border-radius: 20px; border: 1px solid #eef2f6; padding: 24px; margin-bottom: 20px; }
+.settings.on { display: block; }
+.settings h3 { font-size: 1rem; font-weight: 700; margin: 0 0 18px; text-transform: uppercase; letter-spacing: .5px; color: #2563eb; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+.field label { display: block; font-size: .9rem; font-weight: 600; color: #1e293b; margin-bottom: 8px; }
+.field input { width: 100%; padding: 11px 14px; border: 1px solid #dde5ef; border-radius: 12px; font-size: .95rem; font-family: inherit; outline: none; }
+.field input:focus { border-color: #2563eb; }
+.check { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: .9rem; color: #334155; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: #2563eb; color: #fff; font-weight: 600; padding: 12px 26px; border-radius: 40px; font-size: .98rem; border: none; cursor: pointer; font-family: inherit; }
+.btn:hover:not(:disabled) { background: #1d4ed8; }
+.btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+.btn-secondary { background: transparent; color: #2563eb; border: 2px solid #2563eb; }
+.btn-ghost { background: transparent; color: #64748b; border: none; font-weight: 600; padding: 10px 16px; cursor: pointer; border-radius: 40px; font-size: .9rem; font-family: inherit; }
+.stats { display: none; background: linear-gradient(135deg, #eff6ff, #dbeafe); border-radius: 16px; padding: 20px 24px; margin-bottom: 20px; border: 1px solid #bfdbfe; }
+.stats.on { display: block; }
+.stats-row { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 16px; }
+.stat { text-align: center; flex: 1; min-width: 100px; }
+.stat .num { font-size: 1.4rem; font-weight: 800; color: #1e40af; line-height: 1.2; }
+.stat .lbl { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: #1e40af; font-weight: 600; opacity: .85; margin-top: 4px; }
+.results { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.card { background: #fff; border: 1px solid #eef2f6; border-radius: 14px; overflow: hidden; box-shadow: 0 6px 18px -10px rgba(0,0,0,.08); display: flex; flex-direction: column; }
+.thumb { width: 100%; height: 140px; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 1px solid #eef2f6; }
+.thumb img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.info-card { padding: 14px 16px 16px; flex-grow: 1; display: flex; flex-direction: column; }
+.fname { font-size: .85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px; }
+.dims { font-size: .78rem; color: #64748b; margin-bottom: 12px; }
+.dl-btn { background: #2563eb; color: white; font-weight: 600; padding: 9px 12px; border-radius: 30px; font-size: .82rem; border: none; cursor: pointer; text-align: center; font-family: inherit; }
+.priv { margin-top: 28px; padding: 18px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; font-size: .88rem; color: #166534; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Batch Resizer</h1>
+  <p class="lead">Resize multiple images at once to consistent dimensions.</p>
+
+  <div class="drop" id="drop">
+    <span class="ico">🖼️</span>
+    <h3>Drop images here (multiple allowed)</h3>
+    <p>or click to browse — JPG, PNG, WebP</p>
+    <button type="button" class="pick" onclick="document.getElementById('file').click()">Choose images</button>
+    <input type="file" id="file" accept="image/*" multiple style="display:none">
+  </div>
+
+  <div class="settings" id="settings">
+    <h3>⚙️ Resize settings</h3>
+    <div class="grid">
+      <div class="field">
+        <label>Width (px)</label>
+        <input type="number" id="w" value="1200" min="1" max="10000">
+      </div>
+      <div class="field">
+        <label>Height (px)</label>
+        <input type="number" id="h" value="1200" min="1" max="10000">
+      </div>
+    </div>
+    <div class="check">
+      <input type="checkbox" id="lock" checked>
+      <label for="lock" style="margin:0;">Maintain aspect ratio</label>
+    </div>
+  </div>
+
+  <div class="actions" id="actions" style="display:none;">
+    <button type="button" class="btn" id="go">Resize all</button>
+    <button type="button" class="btn btn-secondary" id="dlAll">Download all</button>
+    <button type="button" class="btn-ghost" id="clear">Clear</button>
+  </div>
+
+  <div class="stats" id="statsBar">
+    <div class="stats-row">
+      <div class="stat"><div class="num" id="statCount">0</div><div class="lbl">Files</div></div>
+    </div>
+  </div>
+
+  <div class="results" id="results"></div>
+
+  <div class="priv"><strong>100% private.</strong> Everything runs in your browser.</div>
+</div>
+
+<script>
+(function(){
+  var queue = [];
+  var $ = function(id){ return document.getElementById(id) };
+  var drop = $('drop'), fi = $('file'), settings = $('settings'), actions = $('actions'), statsBar = $('statsBar'), results = $('results');
+  var wIn = $('w'), hIn = $('h'), lock = $('lock'), go = $('go'), dlAll = $('dlAll'), clear = $('clear');
+
+  function uid(){ return 'b_' + Math.random().toString(36).slice(2,10) }
+  function fmt(b){ if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(2)+' MB' }
+
+  function render(){
+    if(queue.length === 0){ settings.classList.remove('on'); actions.style.display = 'none'; statsBar.classList.remove('on'); results.innerHTML = ''; return }
+    settings.classList.add('on'); actions.style.display = 'flex';
+    var done = queue.filter(function(i){ return i.status === 'done' });
+    dlAll.style.display = done.length > 0 ? 'inline-flex' : 'none';
+    statsBar.classList.add('on');
+    $('statCount').textContent = done.length;
+
+    var html = '';
+    queue.forEach(function(item){
+      html += '<div class="card">';
+      html += '<div class="thumb"><img src="' + item.dataUrl + '" alt=""></div>';
+      html += '<div class="info-card">';
+      html += '<div class="fname">' + item.name + '</div>';
+      html += '<div class="dims">' + item.origW + '×' + item.origH;
+      if(item.status === 'done') html += ' → <strong>' + item.newW + '×' + item.newH + '</strong>';
+      html += '</div>';
+      if(item.status === 'done') html += '<button type="button" class="dl-btn" data-action="download" data-id="' + item.id + '">Download</button>';
+      else if(item.status === 'working') html += '<button type="button" class="dl-btn" disabled>Resizing...</button>';
+      else html += '<button type="button" class="dl-btn" data-action="remove" data-id="' + item.id + '" style="background:#f1f5f9;color:#64748b;">Remove</button>';
+      html += '</div></div>';
+    });
+    results.innerHTML = html;
+  }
+
+  function loadFile(file){
+    var id = uid();
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var img = new Image();
+      img.onload = function(){
+        queue.push({ id: id, name: file.name, dataUrl: e.target.result, img: img, origW: img.naturalWidth, origH: img.naturalHeight, status: 'pending' });
+        render();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function resizeItem(item, cb){
+    item.status = 'working'; render();
+    var img = item.img;
+    var tw = parseInt(wIn.value, 10) || img.naturalWidth;
+    var th = parseInt(hIn.value, 10) || img.naturalHeight;
+    if(lock.checked){
+      var r = Math.min(tw / img.naturalWidth, th / img.naturalHeight);
+      tw = Math.round(img.naturalWidth * r);
+      th = Math.round(img.naturalHeight * r);
+    }
+    var c = document.createElement('canvas'); c.width = tw; c.height = th;
+    var x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+    var mime = 'image/jpeg';
+    x.fillStyle = '#fff'; x.fillRect(0, 0, tw, th);
+    x.drawImage(img, 0, 0, tw, th);
+    c.toBlob(function(blob){
+      if(!blob){ item.status = 'pending'; cb(); return }
+      item.blob = blob; item.newW = tw; item.newH = th; item.status = 'done'; cb();
+    }, mime, 0.92);
+  }
+
+  go.addEventListener('click', function(){
+    var pending = queue.filter(function(i){ return i.status !== 'done' });
+    if(pending.length === 0) return;
+    go.disabled = true; go.textContent = 'Resizing...';
+    var i = 0;
+    function next(){
+      if(i >= pending.length){ go.disabled = false; go.textContent = 'Resize all'; render(); return }
+      resizeItem(pending[i++], function(){ render(); setTimeout(next, 10) });
+    }
+    next();
+  });
+
+  dlAll.addEventListener('click', function(){
+    var done = queue.filter(function(i){ return i.status === 'done' && i.blob });
+    done.forEach(function(item, i){
+      setTimeout(function(){
+        var url = URL.createObjectURL(item.blob);
+        var a = document.createElement('a'); a.href = url; a.download = 'resized-' + item.name.replace(/\.[^.]+$/, '') + '.jpg';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url) }, 2000);
+      }, i * 300);
+    });
+  });
+
+  clear.addEventListener('click', function(){
+    if(!queue.length) return;
+    if(!confirm('Remove all images?')) return;
+    queue = []; render();
+  });
+
+  drop.addEventListener('click', function(e){ if(e.target.classList.contains('pick')) return; fi.click() });
+  fi.addEventListener('change', function(e){
+    if(e.target.files) for(var i=0; i<e.target.files.length; i++) loadFile(e.target.files[i]);
+    fi.value = '';
+  });
+  ['dragenter','dragover'].forEach(function(v){ drop.addEventListener(v, function(e){ e.preventDefault(); drop.classList.add('over') }) });
+  ['dragleave','drop'].forEach(function(v){ drop.addEventListener(v, function(e){ e.preventDefault(); drop.classList.remove('over') }) });
+  drop.addEventListener('drop', function(e){
+    if(e.dataTransfer.files) for(var i=0; i<e.dataTransfer.files.length; i++) loadFile(e.dataTransfer.files[i]);
+  });
+  results.addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    var action = btn.getAttribute('data-action'), id = btn.getAttribute('data-id');
+    if(action === 'download'){
+      var item = queue.filter(function(i){ return i.id === id })[0];
+      if(!item || !item.blob) return;
+      var url = URL.createObjectURL(item.blob);
+      var a = document.createElement('a'); a.href = url; a.download = 'resized-' + item.name.replace(/\.[^.]+$/, '') + '.jpg';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url) }, 2000);
+    } else if(action === 'remove'){ queue = queue.filter(function(i){ return i.id !== id }); render() }
+  });
+})();
+</script>
+</body>
+</html>
