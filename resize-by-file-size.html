@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resize by File Size — PixelOptimizer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #0b1b2b; line-height: 1.5; background: #fff; padding: 20px; font-size: 16px; }
+.wrap { max-width: 900px; margin: 0 auto; }
+h1 { font-size: 2rem; font-weight: 700; margin: 0 0 12px; }
+.lead { font-size: 1.05rem; color: #475569; margin: 0 0 28px; }
+.drop { background: #fff; border: 2px dashed #c7d6ec; border-radius: 20px; padding: 48px 24px; text-align: center; cursor: pointer; margin-bottom: 20px; transition: .2s; }
+.drop:hover, .drop.over { border-color: #2563eb; background: #f8faff; }
+.drop .ico { font-size: 3rem; margin-bottom: 16px; display: block; }
+.drop h3 { font-size: 1.3rem; margin: 0 0 8px; font-weight: 700; }
+.drop p { font-size: .95rem; color: #64748b; margin: 0; }
+.pick { display: inline-block; margin-top: 18px; background: #2563eb; color: #fff; font-weight: 600; padding: 11px 26px; border-radius: 40px; font-size: .95rem; border: none; cursor: pointer; font-family: inherit; }
+.pick:hover { background: #1d4ed8; }
+.editor { display: none; background: #fff; border-radius: 20px; border: 1px solid #eef2f6; padding: 24px; margin-bottom: 20px; }
+.editor.on { display: block; }
+.head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #eef2f6; }
+.fname { font-weight: 600; font-size: .95rem; }
+.preview { background: #0b1b2b; border-radius: 12px; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 180px; margin-bottom: 18px; }
+.preview img { max-width: 100%; max-height: 360px; border-radius: 8px; }
+.target-row { background: #eff6ff; border-radius: 12px; padding: 20px; margin-bottom: 18px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.target-row label { font-weight: 700; font-size: .95rem; }
+.target-row input[type=number] { flex: 1; min-width: 120px; padding: 12px 16px; border: 2px solid #2563eb; border-radius: 12px; font-size: 1rem; font-weight: 700; font-family: inherit; text-align: center; outline: none; }
+.target-row select { padding: 12px 16px; border: 2px solid #2563eb; border-radius: 12px; font-size: .95rem; font-weight: 600; font-family: inherit; background: #fff; cursor: pointer; }
+.info { display: flex; gap: 16px; padding: 16px; background: #f8fafc; border-radius: 12px; margin-bottom: 18px; flex-wrap: wrap; justify-content: center; }
+.stat { text-align: center; min-width: 90px; }
+.stat .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; color: #64748b; font-weight: 600; margin-bottom: 4px; }
+.stat .val { font-size: 1rem; font-weight: 700; }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: #2563eb; color: #fff; font-weight: 600; padding: 12px 26px; border-radius: 40px; font-size: .98rem; border: none; cursor: pointer; font-family: inherit; margin-right: 8px; margin-bottom: 8px; }
+.btn:hover:not(:disabled) { background: #1d4ed8; }
+.btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+.ghost { background: transparent; color: #64748b; border: none; font-weight: 600; padding: 10px 16px; cursor: pointer; border-radius: 40px; font-size: .9rem; font-family: inherit; }
+.result { display: none; margin-top: 24px; padding-top: 24px; border-top: 1px solid #eef2f6; }
+.result.on { display: block; }
+.result h3 { font-size: 1.15rem; color: #10b981; margin: 0 0 14px; font-weight: 700; }
+.result img { max-width: 100%; max-height: 360px; border-radius: 12px; display: block; margin: 0 auto 14px; }
+.meta { text-align: center; font-size: .9rem; color: #64748b; margin-bottom: 16px; }
+.priv { margin-top: 28px; padding: 18px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; font-size: .88rem; color: #166534; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Resize by File Size</h1>
+  <p class="lead">Resize and compress an image until it hits your exact target file size.</p>
+
+  <div class="drop" id="drop">
+    <span class="ico">📏</span>
+    <h3>Drop image here</h3>
+    <p>or click to browse — JPG, PNG, WebP</p>
+    <button type="button" class="pick" onclick="document.getElementById('file').click()">Choose image</button>
+    <input type="file" id="file" accept="image/*" style="display:none">
+  </div>
+
+  <div class="editor" id="editor">
+    <div class="head">
+      <div class="fname" id="fname">image.jpg</div>
+      <div style="font-size:.82rem;color:#64748b">Original: <strong id="orig">—</strong></div>
+    </div>
+    <div class="preview"><img id="prev" alt="" style="display:none"></div>
+    <div class="target-row">
+      <label>🎯 Target size:</label>
+      <input type="number" id="num" value="200" min="5" max="10000">
+      <select id="unit">
+        <option value="1024" selected>KB</option>
+        <option value="1048576">MB</option>
+      </select>
+    </div>
+    <div class="info">
+      <div class="stat"><div class="lbl">Original</div><div class="val" id="size">—</div></div>
+      <div class="stat"><div class="lbl">Dimensions</div><div class="val" id="dim">—</div></div>
+    </div>
+    <button type="button" class="btn" id="go">Resize to target size</button>
+    <button type="button" class="ghost" id="reset">Choose another</button>
+
+    <div class="result" id="result">
+      <h3>✓ Resized successfully!</h3>
+      <img id="resultImg" alt="">
+      <div class="meta" id="meta"></div>
+      <div style="text-align:center">
+        <button type="button" class="btn" id="dl">Download resized image</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="priv"><strong>100% private.</strong> Everything runs in your browser.</div>
+</div>
+
+<script>
+(function(){
+  var s = { img: null, url: null };
+  var $ = function(id){ return document.getElementById(id) };
+  var drop = $('drop'), fi = $('file'), ed = $('editor'), pv = $('prev'), fn = $('fname'), os = $('orig'), ss = $('size'), ds = $('dim'), tn = $('num'), tu = $('unit'), go = $('go'), rst = $('reset'), res = $('result'), ri = $('resultImg'), rm = $('meta'), dl = $('dl');
+  if(!drop) return;
+
+  function fmt(b){ if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(2)+' MB' }
+
+  function load(f){
+    if(!f || f.type.indexOf('image/')!==0) return alert('Please select an image.');
+    var r = new FileReader();
+    r.onload = function(e){
+      var i = new Image();
+      i.onload = function(){
+        s.img = i;
+        pv.src = e.target.result; pv.style.display = 'block';
+        ed.classList.add('on'); res.classList.remove('on');
+        fn.textContent = f.name;
+        os.textContent = fmt(f.size);
+        ss.textContent = fmt(f.size);
+        ds.textContent = i.naturalWidth + ' × ' + i.naturalHeight;
+      };
+      i.src = e.target.result;
+    };
+    r.readAsDataURL(f);
+  }
+
+  function compress(target, cb){
+    var i = s.img, scale = 1;
+    function attempt(){
+      var w = Math.round(i.naturalWidth * scale), h = Math.round(i.naturalHeight * scale);
+      var c = document.createElement('canvas'); c.width = w; c.height = h;
+      var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0,0,w,h); x.drawImage(i,0,0,w,h);
+      var lo = 0.05, hi = 0.95, best = null, n = 0;
+      function q(){
+        if(n++ > 10 || hi - lo < 0.015){
+          if(best) return cb(best, w, h);
+          if(scale > 0.15){ scale *= 0.7; return attempt() }
+          return cb(null, 0, 0);
+        }
+        var m = (lo + hi) / 2;
+        c.toBlob(function(b){
+          if(!b) return q();
+          if(b.size <= target){ best = b; lo = m } else { hi = m }
+          q();
+        }, 'image/jpeg', m);
+      }
+      q();
+    }
+    attempt();
+  }
+
+  go.addEventListener('click', function(){
+    if(!s.img) return;
+    var n = parseFloat(tn.value), u = parseFloat(tu.value);
+    if(!n || n <= 0) return alert('Enter a valid target size.');
+    go.disabled = true; go.textContent = 'Resizing...';
+    setTimeout(function(){
+      compress(n * u, function(b, w, h){
+        go.disabled = false; go.textContent = 'Resize to target size';
+        if(!b) return alert('Could not hit target. Try a larger size.');
+        if(s.url) URL.revokeObjectURL(s.url);
+        s.url = URL.createObjectURL(b);
+        ri.src = s.url;
+        rm.innerHTML = w + ' × ' + h + ' px • <strong style="color:#10b981">' + fmt(b.size) + '</strong>';
+        res.classList.add('on');
+        res.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    }, 50);
+  });
+
+  dl.addEventListener('click', function(){
+    if(!s.url) return;
+    var a = document.createElement('a'); a.href = s.url; a.download = 'resized-by-size.jpg';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+
+  rst.addEventListener('click', function(){
+    ed.classList.remove('on'); res.classList.remove('on');
+    s.img = null; fi.value = '';
+    drop.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  drop.addEventListener('click', function(e){
+    if(e.target.classList.contains('pick')) return;
+    fi.click();
+  });
+  fi.addEventListener('change', function(e){
+    if(e.target.files[0]){ load(e.target.files[0]); fi.value = '' }
+  });
+  ['dragenter','dragover'].forEach(function(v){ drop.addEventListener(v, function(e){ e.preventDefault(); drop.classList.add('over') }) });
+  ['dragleave','drop'].forEach(function(v){ drop.addEventListener(v, function(e){ e.preventDefault(); drop.classList.remove('over') }) });
+  drop.addEventListener('drop', function(e){
+    if(e.dataTransfer.files[0]) load(e.dataTransfer.files[0]);
+  });
+})();
+</script>
+</body>
+</html>
