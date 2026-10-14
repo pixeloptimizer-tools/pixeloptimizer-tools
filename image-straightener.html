@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Straightener — PixelOptimizer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #0b1b2b; line-height: 1.5; background: #fff; padding: 20px; font-size: 16px; }
+.wrap { max-width: 900px; margin: 0 auto; }
+h1 { font-size: 2rem; font-weight: 700; margin: 0 0 12px; }
+.lead { font-size: 1.05rem; color: #475569; margin: 0 0 28px; }
+.drop { background: #fff; border: 2px dashed #c7d6ec; border-radius: 20px; padding: 48px 24px; text-align: center; cursor: pointer; margin-bottom: 20px; transition: .2s; }
+.drop:hover, .drop.over { border-color: #2563eb; background: #f8faff; }
+.drop .ico { font-size: 3rem; margin-bottom: 16px; display: block; }
+.drop h3 { font-size: 1.3rem; margin: 0 0 8px; font-weight: 700; }
+.drop p { font-size: .95rem; color: #64748b; margin: 0; }
+.pick { display: inline-block; margin-top: 18px; background: #2563eb; color: #fff; font-weight: 600; padding: 11px 26px; border-radius: 40px; font-size: .95rem; border: none; cursor: pointer; font-family: inherit; }
+.editor { display: none; background: #fff; border-radius: 20px; border: 1px solid #eef2f6; padding: 24px; }
+.editor.on { display: block; }
+.head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #eef2f6; }
+.fname { font-weight: 600; font-size: .95rem; }
+.preview { background: #0b1b2b; border-radius: 12px; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 220px; margin-bottom: 18px; overflow: hidden; }
+.preview img { max-width: 100%; max-height: 400px; border-radius: 8px; transition: transform .3s ease; }
+.hint { background: #eff6ff; border-radius: 12px; padding: 16px 20px; margin-bottom: 18px; font-size: .9rem; color: #1e40af; }
+.slider-row { background: #f8fafc; border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
+.slider-row label { display: flex; justify-content: space-between; font-weight: 600; font-size: .9rem; margin-bottom: 10px; }
+.slider-row label span { color: #2563eb; }
+.slider-row input[type=range] { width: 100%; -webkit-appearance: none; appearance: none; height: 6px; background: #e2e8f0; border-radius: 3px; outline: none; }
+.slider-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; background: #2563eb; border-radius: 50%; cursor: pointer; border: 3px solid #fff; box-shadow: 0 2px 6px rgba(37,99,235,.4); }
+.slider-row input[type=range]::-moz-range-thumb { width: 22px; height: 22px; background: #2563eb; border: 3px solid #fff; border-radius: 50%; cursor: pointer; }
+.quick-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.quick-btn { background: #fff; color: #334155; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 40px; font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+.quick-btn:hover { background: #eff6ff; border-color: #2563eb; color: #2563eb; }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: #2563eb; color: #fff; font-weight: 600; padding: 12px 26px; border-radius: 40px; font-size: .98rem; border: none; cursor: pointer; font-family: inherit; margin-right: 8px; margin-bottom: 8px; }
+.btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+.ghost { background: transparent; color: #64748b; border: none; font-weight: 600; padding: 10px 16px; cursor: pointer; border-radius: 40px; font-size: .9rem; font-family: inherit; }
+.result { display: none; margin-top: 24px; padding-top: 24px; border-top: 1px solid #eef2f6; }
+.result.on { display: block; }
+.result h3 { font-size: 1.15rem; color: #10b981; margin: 0 0 14px; font-weight: 700; }
+.result img { max-width: 100%; max-height: 400px; border-radius: 12px; display: block; margin: 0 auto 14px; }
+.meta { text-align: center; font-size: .9rem; color: #64748b; margin-bottom: 16px; }
+.priv { margin-top: 28px; padding: 18px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; font-size: .88rem; color: #166534; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Image Straightener</h1>
+  <p class="lead">Fix tilted horizons and slanted photos with fine angle adjustment.</p>
+
+  <div class="drop" id="drop">
+    <span class="ico">📐</span>
+    <h3>Drop image here</h3>
+    <p>or click to browse — JPG, PNG, WebP</p>
+    <button type="button" class="pick" onclick="document.getElementById('file').click()">Choose image</button>
+    <input type="file" id="file" accept="image/*" style="display:none">
+  </div>
+
+  <div class="editor" id="editor">
+    <div class="head">
+      <div class="fname" id="fname">image.jpg</div>
+      <div style="font-size:.82rem;color:#64748b">Original: <strong id="dim">—</strong></div>
+    </div>
+    <div class="preview"><img id="prev" alt="" style="display:none"></div>
+
+    <div class="hint">Drag the slider to fine-tune the angle. The image is auto-cropped to remove empty corners.</div>
+
+    <div class="slider-row">
+      <label>Angle <span id="angleVal">0.0°</span></label>
+      <input type="range" id="angle" min="-45" max="45" value="0" step="0.5">
+      <div class="quick-row">
+        <button type="button" class="quick-btn" data-deg="-5">-5°</button>
+        <button type="button" class="quick-btn" data-deg="-2">-2°</button>
+        <button type="button" class="quick-btn" data-deg="0">Reset</button>
+        <button type="button" class="quick-btn" data-deg="2">+2°</button>
+        <button type="button" class="quick-btn" data-deg="5">+5°</button>
+      </div>
+    </div>
+
+    <button type="button" class="btn" id="go">Straighten image</button>
+    <button type="button" class="ghost" id="reset">Choose another</button>
+
+    <div class="result" id="result">
+      <h3>✓ Straightened successfully!</h3>
+      <img id="resultImg" alt="">
+      <div class="meta" id="meta"></div>
+      <div style="text-align:center">
+        <button type="button" class="btn" id="dl">Download straightened image</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="priv"><strong>100% private.</strong> Everything runs in your browser.</div>
+</div>
+
+<script>
+(function(){
+  var s = { img: null, url: null, angle: 0 };
+  var $ = function(id){ return document.getElementById(id) };
+  var drop = $('drop'), fi = $('file'), ed = $('editor'), pv = $('prev'), fn = $('fname'), dm = $('dim'), angle = $('angle'), angleVal = $('angleVal'), go = $('go'), rst = $('reset'), res = $('result'), ri = $('resultImg'), rm = $('meta'), dl = $('dl');
+  if(!drop) return;
+
+  function load(f){
+    if(!f || f.type.indexOf('image/')!==0) return alert('Please select an image.');
+    var r = new FileReader();
+    r.onload = function(e){
+      var i = new Image();
+      i.onload = function(){
+        s.img = i;
+        pv.src = e.target.result; pv.style.display = 'block';
+        ed.classList.add('on'); res.classList.remove('on');
+        fn.textContent = f.name;
+        dm.textContent = i.naturalWidth + ' × ' + i.naturalHeight;
+        s.angle = 0; angle.value = 0; angleVal.textContent = '0.0°';
+        pv.style.transform = 'rotate(0deg)';
+      };
+      i.src = e.target.result;
+    };
+    r.readAsDataURL(f);
+  }
+
+  angle.addEventListener('input', function(){
+    s.angle = parseFloat(angle.value);
+    angleVal.textContent = s.angle.toFixed(1) + '°';
+    pv.style.transform = 'rotate(' + s.angle + 'deg)';
+  });
+
+  document.querySelectorAll('.quick-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var d = parseFloat(btn.getAttribute('data-deg'));
+      angle.value = d;
+      s.angle = d;
+      angleVal.textContent = d.toFixed(1) + '°';
+      pv.style.transform = 'rotate(' + d + 'deg)';
+    });
+  });
+
+  go.addEventListener('click', function(){
+    if(!s.img) return;
+    go.disabled = true; go.textContent = 'Straightening...';
+    var w = s.img.naturalWidth, h = s.img.naturalHeight;
+    var rad = s.angle * Math.PI / 180;
+    var cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
+    var newW = Math.round(w * cos + h * sin);
+    var newH = Math.round(w * sin + h * cos);
+    // Inner rect after rotation to crop corners
+    var cropW = Math.floor(w * cos - h * sin);
+    var cropH = Math.floor(h * cos - w * sin);
+    if(cropW < 10 || cropH < 10){ cropW = w * 0.7; cropH = h * 0.7; }
+    var c = document.createElement('canvas'); c.width = cropW; c.height = cropH;
+    var x = c.getContext('2d');
+    x.fillStyle = '#ffffff';
+    x.fillRect(0, 0, cropW, cropH);
+    x.translate(cropW/2, cropH/2);
+    x.rotate(rad);
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(s.img, -w/2, -h/2);
+    c.toBlob(function(b){
+      go.disabled = false; go.textContent = 'Straighten image';
+      if(!b) return alert('Straighten failed.');
+      if(s.url) URL.revokeObjectURL(s.url);
+      s.url = URL.createObjectURL(b);
+      ri.src = s.url;
+      rm.innerHTML = cropW + ' × ' + cropH + ' px • Angle: ' + s.angle.toFixed(1) + '° • <strong style="color:#10b981">' + (b.size/1024).toFixed(1) + ' KB</strong>';
+      res.classList.add('on');
+      res.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 'image/jpeg', 0.92);
+  });
+
+  dl.addEventListener('click', function(){
+    if(!s.url) return;
+    var a = document.createElement('a'); a.href = s.url; a.download = 'straightened.jpg';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+
+  rst.addEventListener('click', function(){
+    ed.classList.remove('on'); res.classList.remove('on');
+    s.img = null; fi.value = '';
+    drop.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  drop.addEventListener('click', function(e){ if(e.target.classList.contains('pick')) return; fi.click() });
+  fi.addEventListener('change', function(e){ if(e.target.files[0]){ load(e.target.files[0]); fi.value = '' } });
+  ['dragenter','dragover'].forEach(function(v){ drop.addEventListener(v, function(e){ e.preventDefault(); drop.classList.add('over') }) });
+  ['dragleave','drop'].forEach(function(v){ drop.addEventListener(v, function(e){ e.preventDefault(); drop.classList.remove('over') }) });
+  drop.addEventListener('drop', function(e){ if(e.dataTransfer.files[0]) load(e.dataTransfer.files[0]) });
+})();
+</script>
+</body>
+</html>
