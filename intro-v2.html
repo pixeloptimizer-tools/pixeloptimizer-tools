@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelOptimizer — 18s 3D Intro</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0b1b2b; overflow: hidden; font-family: 'Inter', -apple-system, sans-serif; color: #fff; }
+  canvas { display: block; }
+  #overlay {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+  }
+  #overlay.visible { opacity: 1; }
+  #overlay h1 {
+    font-size: 4.5rem; font-weight: 800; letter-spacing: -0.03em;
+    background: linear-gradient(135deg, #fff 0%, #93c5fd 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    margin-bottom: 12px; text-shadow: 0 0 60px rgba(37, 99, 235, 0.5);
+  }
+  #overlay p { font-size: 1.15rem; color: #93c5fd; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; }
+  #replay {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(37, 99, 235, 0.9); color: white; border: none;
+    padding: 12px 28px; border-radius: 40px; font-family: 'Inter', sans-serif;
+    font-weight: 600; font-size: 0.9rem; cursor: pointer; z-index: 100;
+    opacity: 0; transition: opacity 0.5s ease;
+  }
+  #replay.visible { opacity: 1; }
+  #replay:hover { background: #1d4ed8; }
+  #loading {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #93c5fd; font-size: 1rem; z-index: 50; background: #0b1b2b;
+  }
+</style>
+</head>
+<body>
+<div id="loading">Loading 3D intro...</div>
+<div id="overlay">
+  <h1>PixelOptimizer</h1>
+  <p>Compress · Resize · Convert · Crop</p>
+</div>
+<button id="replay">↻ Replay</button>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ---------- SETUP ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1b2b);
+scene.fog = new THREE.Fog(0x0b1b2b, 20, 60);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 0, 18);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+// ---------- LIGHTS ----------
+scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+const point1 = new THREE.PointLight(0x2563eb, 120, 60); point1.position.set(10, 10, 10); scene.add(point1);
+const point2 = new THREE.PointLight(0x60a5fa, 80, 60); point2.position.set(-10, -5, 8); scene.add(point2);
+const point3 = new THREE.PointLight(0x1d4ed8, 100, 60); point3.position.set(0, -12, -10); scene.add(point3);
+
+// ---------- FLOATING FRAMES (background) ----------
+const frameGroup = new THREE.Group(); scene.add(frameGroup);
+const frameColors = [0x2563eb, 0x3b82f6, 0x60a5fa, 0x93c5fd, 0x1d4ed8];
+const frames = [];
+
+for (let i = 0; i < 40; i++) {
+  const w = 1.2 + Math.random() * 1.6;
+  const h = 0.8 + Math.random() * 1.0;
+  const geo = new THREE.PlaneGeometry(w, h);
+  const mat = new THREE.MeshStandardMaterial({
+    color: frameColors[i % frameColors.length],
+    emissive: frameColors[i % frameColors.length],
+    emissiveIntensity: 0.6,
+    transparent: true, opacity: 0.85, side: THREE.DoubleSide,
+    metalness: 0.3, roughness: 0.4
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  const radius = 6 + Math.random() * 15;
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.acos(2 * Math.random() - 1);
+  mesh.position.set(
+    radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.sin(phi) * Math.sin(theta),
+    radius * Math.cos(phi) - 5
+  );
+  mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+  mesh.userData = {
+    basePos: mesh.position.clone(),
+    baseRot: { x: mesh.rotation.x, y: mesh.rotation.y, z: mesh.rotation.z },
+    speed: 0.3 + Math.random() * 0.7,
+    phase: Math.random() * Math.PI * 2
+  };
+  frames.push(mesh);
+  frameGroup.add(mesh);
+}
+
+// ---------- PIXEL PARTICLES ----------
+const particleGroup = new THREE.Group(); scene.add(particleGroup);
+const pixelColors = [0x2563eb, 0x60a5fa, 0x93c5fd, 0xbfdbfe];
+const pixelGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+const particles = [];
+
+for (let i = 0; i < 500; i++) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: pixelColors[i % pixelColors.length],
+    emissive: pixelColors[i % pixelColors.length],
+    emissiveIntensity: 1.2,
+    transparent: true, opacity: 0.9
+  });
+  const pixel = new THREE.Mesh(pixelGeo, mat);
+  const r = 4 + Math.random() * 22;
+  const t = Math.random() * Math.PI * 2;
+  const p = Math.acos(2 * Math.random() - 1);
+  pixel.position.set(
+    r * Math.sin(p) * Math.cos(t),
+    r * Math.sin(p) * Math.sin(t),
+    r * Math.cos(p) - 8
+  );
+  pixel.userData = {
+    basePos: pixel.position.clone(),
+    speed: 0.5 + Math.random() * 1.5,
+    phase: Math.random() * Math.PI * 2,
+    scaleBase: 0.5 + Math.random() * 1.5
+  };
+  particles.push(pixel);
+  particleGroup.add(pixel);
+}
+
+// ---------- CENTRAL LOGO CUBE ----------
+const logoGroup = new THREE.Group(); scene.add(logoGroup);
+const logoBoxGeo = new THREE.BoxGeometry(2.2, 2.2, 2.2);
+const logoBoxMat = new THREE.MeshStandardMaterial({
+  color: 0x2563eb, emissive: 0x2563eb, emissiveIntensity: 1.5,
+  metalness: 0.8, roughness: 0.2
+});
+logoGroup.add(new THREE.Mesh(logoBoxGeo, logoBoxMat));
+logoGroup.add(new THREE.Mesh(logoBoxGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.2 })));
+logoGroup.scale.set(0.01, 0.01, 0.01);
+
+// ---------- CATEGORY CARDS ----------
+// Four cards, each with category name + icon grid
+const CARD_W = 5;
+const CARD_H = 6;
+const cards = [];
+
+const categoryData = [
+  { 
+    name: 'COMPRESS', color: 0x2563eb, dir: 'left',
+    icons: ['🗜️', '📉', '📊', '🗂️', '🎯', '⚡'], 
+    count: '6 tools' 
+  },
+  { 
+    name: 'RESIZE', color: 0x3b82f6, dir: 'right',
+    icons: ['📐', '↔️', '📷', '🖼️', '👤'], 
+    count: '5 tools' 
+  },
+  { 
+    name: 'CONVERT', color: 0x60a5fa, dir: 'top',
+    icons: ['🔄', 'JPG', 'PNG', 'WebP', '🖼️', '📸', '✨'], 
+    count: '7 tools' 
+  },
+  { 
+    name: 'CROP', color: 0x93c5fd, dir: 'bottom',
+    icons: ['✂️', '⬛', '⭕', '🔄', '↔️', '📐', '🖼️'], 
+    count: '7 tools' 
+  }
+];
+
+function createCardCanvas(category) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 614;
+  const ctx = canvas.getContext('2d');
+  
+  // Background
+  const grad = ctx.createLinearGradient(0, 0, 0, 614);
+  grad.addColorStop(0, '#1e3a8a');
+  grad.addColorStop(1, '#0b1b2b');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 512, 614);
+  
+  // Border
+  ctx.strokeStyle = '#' + category.color.toString(16).padStart(6, '0');
+  ctx.lineWidth = 6;
+  ctx.strokeRect(3, 3, 506, 608);
+  
+  // Category name
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 56px Inter, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(category.name, 256, 100);
+  
+  // Count
+  ctx.fillStyle = '#' + category.color.toString(16).padStart(6, '0');
+  ctx.font = '600 28px Inter, Arial, sans-serif';
+  ctx.fillText(category.count, 256, 145);
+  
+  // Divider
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(60, 180);
+  ctx.lineTo(452, 180);
+  ctx.stroke();
+  
+  // Icons grid
+  const cols = 3;
+  const iconSize = 100;
+  const iconGapX = 30;
+  const iconGapY = 30;
+  const totalW = cols * iconSize + (cols - 1) * iconGapX;
+  const startX = (512 - totalW) / 2;
+  const startY = 240;
+  
+  category.icons.slice(0, 6).forEach((icon, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = startX + col * (iconSize + iconGapX);
+    const y = startY + row * (iconSize + iconGapY);
+    
+    // Icon background
+    ctx.fillStyle = 'rgba(37, 99, 235, 0.3)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, iconSize, iconSize, 16);
+    ctx.fill();
+    
+    // Icon border
+    ctx.strokeStyle = 'rgba(147, 197, 253, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(x, y, iconSize, iconSize, 16);
+    ctx.stroke();
+    
+    // Icon emoji / text
+    ctx.font = 'bold 48px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    // If icon is text (like JPG/PNG/WebP), use smaller font
+    const fontSize = icon.length > 3 ? 26 : 48;
+    ctx.font = `bold ${fontSize}px Inter, Arial, sans-serif`;
+    ctx.fillText(icon, x + iconSize/2, y + iconSize/2 + 2);
+  });
+  
+  return canvas;
+}
+
+// Create 4 cards as textured planes
+categoryData.forEach((cat, i) => {
+  const canvas = createCardCanvas(cat);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  const geo = new THREE.PlaneGeometry(CARD_W, CARD_H);
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex,
+    emissive: new THREE.Color(cat.color),
+    emissiveIntensity: 0.3,
+    side: THREE.DoubleSide,
+    transparent: true
+  });
+  const card = new THREE.Mesh(geo, mat);
+  
+  // Starting positions (off-screen in cardinal directions)
+  const startPositions = {
+    left: new THREE.Vector3(-14, 0, 0),
+    right: new THREE.Vector3(14, 0, 0),
+    top: new THREE.Vector3(0, 12, 0),
+    bottom: new THREE.Vector3(0, -12, 0)
+  };
+  
+  card.userData = {
+    category: cat,
+    startPos: startPositions[cat.dir],
+    visible: false,
+    progress: 0
+  };
+  
+  card.position.copy(card.userData.startPos);
+  card.visible = false;
+  cards.push(card);
+  scene.add(card);
+});
+
+// ---------- ANIMATION ----------
+const clock = new THREE.Clock();
+let elapsed = 0;
+const DURATION = 18;
+
+// Card visible windows [start, end] in seconds
+const CARD_TIMELINE = [
+  [6.5, 8.5],   // Card 1
+  [8.5, 10.5],  // Card 2
+  [10.5, 12.5], // Card 3
+  [12.5, 14.5]  // Card 4
+];
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function easeOutBack(t) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  
+  const dt = clock.getDelta();
+  elapsed += dt;
+  
+  // ============ CAMERA ============
+  if (elapsed < 3) {
+    // Drift back, reveal frames
+    const p = elapsed / 3;
+    camera.position.z = 18 + Math.sin(p * Math.PI) * 4;
+    camera.position.x = Math.sin(p * Math.PI * 0.7) * 2;
+    camera.lookAt(0, 0, 0);
+  } else if (elapsed < 5.5) {
+    // Fly through frames
+    const p = (elapsed - 3) / 2.5;
+    const eased = easeInOutCubic(p);
+    camera.position.z = 22 - eased * 18;
+    camera.position.x = Math.sin(p * Math.PI) * 1.5;
+    camera.position.y = Math.cos(p * Math.PI) * 1.0;
+    camera.lookAt(0, 0, 0);
+  } else if (elapsed < 14.5) {
+    // Settle for card sequence — slight drift
+    const t = elapsed - 5.5;
+    camera.position.set(
+      Math.sin(t * 0.5) * 0.3,
+      Math.cos(t * 0.4) * 0.2,
+      4
+    );
+    camera.lookAt(0, 0, 0);
+  } else if (elapsed < 17) {
+    // Return to logo
+    const p = (elapsed - 14.5) / 2.5;
+    const eased = easeInOutCubic(p);
+    camera.position.z = 4 - eased * 2.5;
+    camera.position.x = Math.sin(p * Math.PI) * 0.5;
+    camera.lookAt(0, 0, 0);
+  } else {
+    // Final logo view
+    const p = Math.min((elapsed - 17) / 1, 1);
+    camera.position.z = 1.5 - p * 0.3;
+    camera.lookAt(0, 0, 0);
+  }
+  
+  // ============ FRAMES ============
+  frames.forEach((frame) => {
+    const time = elapsed * frame.userData.speed + frame.userData.phase;
+    frame.position.x = frame.userData.basePos.x + Math.sin(time * 0.5) * 0.5;
+    frame.position.y = frame.userData.basePos.y + Math.cos(time * 0.5) * 0.5;
+    frame.rotation.x = frame.userData.baseRot.x + Math.sin(time * 0.3) * 0.3;
+    frame.rotation.y = frame.userData.baseRot.y + Math.cos(time * 0.3) * 0.3;
+    
+    // Fade during card phase
+    if (elapsed > 5.5 && elapsed < 14.5) {
+      frame.material.opacity = 0.15;
+    } else if (elapsed >= 14.5) {
+      frame.material.opacity = Math.max(0, 0.15 - (elapsed - 14.5) * 0.1);
+    } else {
+      frame.material.opacity = 0.85;
+    }
+  });
+  
+  // ============ PARTICLES ============
+  particles.forEach((p) => {
+    const time = elapsed * p.userData.speed + p.userData.phase;
+    p.position.x = p.userData.basePos.x + Math.sin(time * 0.4) * 0.8;
+    p.position.y = p.userData.basePos.y + Math.cos(time * 0.4) * 0.8;
+    p.rotation.x += dt * p.userData.speed;
+    p.rotation.y += dt * p.userData.speed * 0.7;
+    const scale = p.userData.scaleBase * (0.6 + Math.sin(time * 2) * 0.4);
+    p.scale.setScalar(scale);
+    
+    if (elapsed > 14.5) {
+      p.material.opacity = Math.max(0, 0.9 - (elapsed - 14.5) * 0.3);
+    } else {
+      p.material.opacity = 0.9;
+    }
+  });
+  
+  // ============ LOGO ============
+  if (elapsed < 5) {
+    logoGroup.scale.set(0.01, 0.01, 0.01);
+    logoGroup.rotation.x += dt * 2;
+    logoGroup.rotation.y += dt * 2.5;
+  } else if (elapsed < 6) {
+    const p = (elapsed - 5);
+    const s = easeOutBack(p);
+    logoGroup.scale.set(s, s, s);
+    logoGroup.rotation.x += dt * 1;
+    logoGroup.rotation.y += dt * 1.5;
+  } else if (elapsed < 6.5) {
+    // Shrink logo away before cards appear
+    const p = (elapsed - 6) / 0.5;
+    const s = 1 - p;
+    logoGroup.scale.set(s, s, s);
+    logoGroup.rotation.x += dt * 2;
+    logoGroup.rotation.y += dt * 2;
+  } else if (elapsed >= 6.5 && elapsed < 14.5) {
+    logoGroup.scale.set(0.001, 0.001, 0.001);
+  } else if (elapsed >= 14.5 && elapsed < 17) {
+    // Logo comes back
+    const p = (elapsed - 14.5) / 2.5;
+    const s = easeOutBack(Math.min(p * 1.2, 1));
+    logoGroup.scale.set(s, s, s);
+    logoGroup.rotation.x += dt * 1;
+    logoGroup.rotation.y += dt * 1.2;
+  } else {
+    logoGroup.scale.set(1, 1, 1);
+    logoGroup.rotation.x += dt * 0.5;
+    logoGroup.rotation.y += dt * 0.8;
+  }
+  
+  // ============ CARDS ============
+  cards.forEach((card, i) => {
+    const [start, end] = CARD_TIMELINE[i];
+    
+    if (elapsed < start) {
+      // Not visible yet
+      card.visible = false;
+      card.position.copy(card.userData.startPos);
+      card.material.opacity = 0;
+    } else if (elapsed >= start && elapsed < end) {
+      // Visible — animate in
+      card.visible = true;
+      const p = Math.min((elapsed - start) / 0.6, 1);
+      const eased = easeOutBack(p);
+      
+      // Move from start position to center
+      const targetPos = new THREE.Vector3(0, 0, 0);
+      card.position.lerpVectors(card.userData.startPos, targetPos, eased);
+      
+      // Rotate to face camera
+      card.rotation.x = 0;
+      card.rotation.y = Math.sin((elapsed - start) * 0.8) * 0.15;
+      card.rotation.z = Math.sin((elapsed - start) * 0.6) * 0.05;
+      
+      card.material.opacity = Math.min((elapsed - start) * 2, 1);
+      
+      // Exit animation at the end
+      if (elapsed > end - 0.5) {
+        const exitP = (elapsed - (end - 0.5)) / 0.5;
+        const oppositePos = card.userData.startPos.clone().multiplyScalar(-1);
+        card.position.lerpVectors(targetPos, oppositePos, exitP);
+        card.material.opacity = 1 - exitP;
+      }
+    } else {
+      // Past the window
+      card.visible = false;
+    }
+  });
+  
+  // ============ LIGHTS ============
+  point1.position.x = Math.sin(elapsed * 0.5) * 12;
+  point1.position.y = Math.cos(elapsed * 0.5) * 12;
+  point2.position.x = Math.cos(elapsed * 0.6) * 10;
+  point2.position.y = Math.sin(elapsed * 0.6) * 10;
+  
+  // ============ OVERLAY ============
+  if (elapsed >= 16.5 && !document.getElementById('overlay').classList.contains('visible')) {
+    document.getElementById('overlay').classList.add('visible');
+    document.getElementById('replay').classList.add('visible');
+  }
+  
+  renderer.render(scene, camera);
+}
+
+// ---------- START ----------
+setTimeout(() => {
+  document.getElementById('loading').style.display = 'none';
+  animate();
+}, 300);
+
+// ---------- REPLAY ----------
+document.getElementById('replay').addEventListener('click', () => {
+  elapsed = 0;
+  camera.position.set(0, 0, 18);
+  logoGroup.scale.set(0.01, 0.01, 0.01);
+  cards.forEach(c => { c.visible = false; c.position.copy(c.userData.startPos); c.material.opacity = 0; });
+  document.getElementById('overlay').classList.remove('visible');
+  document.getElementById('replay').classList.remove('visible');
+});
+
+// ---------- RESIZE ----------
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
